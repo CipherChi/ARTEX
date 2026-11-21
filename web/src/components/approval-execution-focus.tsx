@@ -4,7 +4,6 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { Activity, InterceptExecution } from "@/lib/types";
-import { t } from "@/i18n";
 
 // Resolve one exact persisted call, independently of transcript pagination.
 export function useApprovalFocus({ taskId, conversationId }: { taskId?: string; conversationId?: number }) {
@@ -35,12 +34,12 @@ export function useApprovalFocus({ taskId, conversationId }: { taskId?: string; 
             ? source.conversation_id !== conversationId
             : source.task_id !== taskId || source.conversation_id != null
         ) {
-          throw new Error(t("Approval source does not match the current conversation"));
+          throw new Error("审批来源与当前会话不一致");
         }
         setState({ id, source, loading: false });
       })
       .catch((e) => {
-        if (!cancelled) setState({ id, error: (e as Error).message || t("Unable to locate the original execution"), loading: false });
+        if (!cancelled) setState({ id, error: (e as Error).message || "无法定位原始执行", loading: false });
       });
     return () => {
       cancelled = true;
@@ -79,13 +78,13 @@ export function useApprovalHistory(
         const page = await loadPage(before);
         if (cancelled) return;
         if (!page.items.length || (before > 0 && page.items[0].seq >= before)) {
-          throw new Error(t("Matching tool call not found in the conversation; the record may have been deleted"));
+          throw new Error("会话中未找到对应工具调用，记录可能已删除");
         }
         mergePage(page);
         current = page.items;
         before = current[0].seq;
         if (!page.hasMore && !current.some((a) => a.seq === source.seq)) {
-          throw new Error(t("Matching tool call not found in the conversation"));
+          throw new Error("会话中未找到对应工具调用");
         }
       }
       if (!cancelled) setResult({ source });
@@ -119,19 +118,19 @@ export function ApprovalExecutionFocus({
     >
       <span className={error ? "text-destructive" : "text-muted-foreground"}>
         {error
-          ? t("Unable to locate: {error}", { error })
+          ? `无法定位：${error}`
           : history.ready
-            ? t("Expanded the tool call for approval #{id}", { id: state.id })
-            : t("Loading the conversation position of approval #{id}…", { id: state.id })}
+            ? `已展开审批 #${state.id} 对应的工具调用`
+            : `正在加载审批 #${state.id} 所在的对话位置…`}
       </span>
       <div className="flex gap-2">
         {error ? (
           <Button size="sm" variant="outline" onClick={focus.retry}>
-            {t("Retry locate")}
+            重试定位
           </Button>
         ) : null}
         <Button size="sm" variant="ghost" onClick={focus.close}>
-          {t("Cancel locate")}
+          取消定位
         </Button>
       </div>
     </div>

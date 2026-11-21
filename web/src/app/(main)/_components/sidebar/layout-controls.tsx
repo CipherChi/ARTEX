@@ -21,7 +21,6 @@ import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { THEME_PRESET_OPTIONS, type ThemeMode, type ThemePreset } from "@/lib/preferences/theme";
 import { applyThemePreset } from "@/lib/preferences/theme-utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
-import { type Locale, LOCALES, locale, setLocale, t } from "@/i18n";
 
 export function LayoutControls() {
   const themeMode = usePreferencesStore((s) => s.themeMode);
@@ -107,33 +106,15 @@ export function LayoutControls() {
       <PopoverContent align="end">
         <div className="flex flex-col gap-5">
           <div className="space-y-1.5">
-            <h4 className="font-medium text-sm leading-none">{t("Preferences")}</h4>
-            <p className="text-muted-foreground text-xs">{t("Customize your dashboard layout preferences.")}</p>
+            <h4 className="font-medium text-sm leading-none">Preferences</h4>
+            <p className="text-muted-foreground text-xs">Customize your dashboard layout preferences.</p>
           </div>
           <div className="space-y-3 **:data-[slot=toggle-group]:w-full **:data-[slot=toggle-group-item]:flex-1 **:data-[slot=toggle-group-item]:text-xs">
             <div className="space-y-1">
-              <Label className="font-medium text-xs">{t("Language")}</Label>
-              <ToggleGroup
-                size="sm"
-                spacing={0}
-                variant="outline"
-                type="single"
-                value={locale}
-                onValueChange={(v: string) => v && setLocale(v as Locale)}
-              >
-                {LOCALES.map((l) => (
-                  <ToggleGroupItem key={l.code} value={l.code} aria-label={l.label}>
-                    {l.label}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="font-medium text-xs">{t("Theme Preset")}</Label>
+              <Label className="font-medium text-xs">Theme Preset</Label>
               <Select value={themePreset} onValueChange={onThemePresetChange}>
                 <SelectTrigger size="sm" className="w-full text-xs">
-                  <SelectValue placeholder={t("Preset")} />
+                  <SelectValue placeholder="Preset" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -155,10 +136,10 @@ export function LayoutControls() {
             </div>
 
             <div className="space-y-1">
-              <Label className="font-medium text-xs">{t("Fonts")}</Label>
+              <Label className="font-medium text-xs">Fonts</Label>
               <Select value={font} onValueChange={onFontChange}>
                 <SelectTrigger size="sm" className="w-full text-xs">
-                  <SelectValue placeholder={t("Select font")} />
+                  <SelectValue placeholder="Select font" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -173,7 +154,7 @@ export function LayoutControls() {
             </div>
 
             <div className="space-y-1">
-              <Label className="font-medium text-xs">{t("Theme Mode")}</Label>
+              <Label className="font-medium text-xs">Theme Mode</Label>
               <ToggleGroup
                 size="sm"
                 spacing={0}
@@ -182,20 +163,20 @@ export function LayoutControls() {
                 value={themeMode}
                 onValueChange={onThemeModeChange}
               >
-                <ToggleGroupItem value="light" aria-label={t("Light")}>
-                  {t("Light")}
+                <ToggleGroupItem value="light" aria-label="Toggle light">
+                  Light
                 </ToggleGroupItem>
-                <ToggleGroupItem value="dark" aria-label={t("Dark")}>
-                  {t("Dark")}
+                <ToggleGroupItem value="dark" aria-label="Toggle dark">
+                  Dark
                 </ToggleGroupItem>
-                <ToggleGroupItem value="system" aria-label={t("System")}>
-                  {t("System")}
+                <ToggleGroupItem value="system" aria-label="Toggle system">
+                  System
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
 
             <div className="space-y-1">
-              <Label className="font-medium text-xs">{t("Page Layout")}</Label>
+              <Label className="font-medium text-xs">Page Layout</Label>
               <ToggleGroup
                 size="sm"
                 spacing={0}
@@ -204,17 +185,17 @@ export function LayoutControls() {
                 value={contentLayout}
                 onValueChange={onContentLayoutChange}
               >
-                <ToggleGroupItem value="centered" aria-label={t("Centered")}>
-                  {t("Centered")}
+                <ToggleGroupItem value="centered" aria-label="Toggle centered">
+                  Centered
                 </ToggleGroupItem>
-                <ToggleGroupItem value="full-width" aria-label={t("Full Width")}>
-                  {t("Full Width")}
+                <ToggleGroupItem value="full-width" aria-label="Toggle full-width">
+                  Full Width
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
 
             <div className="space-y-1">
-              <Label className="font-medium text-xs">{t("Navbar Behavior")}</Label>
+              <Label className="font-medium text-xs">Navbar Behavior</Label>
               <ToggleGroup
                 size="sm"
                 spacing={0}
@@ -223,17 +204,17 @@ export function LayoutControls() {
                 value={navbarStyle}
                 onValueChange={onNavbarStyleChange}
               >
-                <ToggleGroupItem value="sticky" aria-label={t("Sticky")}>
-                  {t("Sticky")}
+                <ToggleGroupItem value="sticky" aria-label="Toggle sticky">
+                  Sticky
                 </ToggleGroupItem>
-                <ToggleGroupItem value="scroll" aria-label={t("Scroll")}>
-                  {t("Scroll")}
+                <ToggleGroupItem value="scroll" aria-label="Toggle scroll">
+                  Scroll
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
 
             <div className="space-y-1">
-              <Label className="font-medium text-xs">{t("Sidebar Style")}</Label>
+              <Label className="font-medium text-xs">Sidebar Style</Label>
               <ToggleGroup
                 size="sm"
                 spacing={0}
@@ -242,20 +223,20 @@ export function LayoutControls() {
                 value={variant}
                 onValueChange={onSidebarStyleChange}
               >
-                <ToggleGroupItem value="inset" aria-label={t("Inset")}>
-                  {t("Inset")}
+                <ToggleGroupItem value="inset" aria-label="Toggle inset">
+                  Inset
                 </ToggleGroupItem>
-                <ToggleGroupItem value="sidebar" aria-label={t("Sidebar")}>
-                  {t("Sidebar")}
+                <ToggleGroupItem value="sidebar" aria-label="Toggle sidebar">
+                  Sidebar
                 </ToggleGroupItem>
-                <ToggleGroupItem value="floating" aria-label={t("Floating")}>
-                  {t("Floating")}
+                <ToggleGroupItem value="floating" aria-label="Toggle floating">
+                  Floating
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
 
             <div className="space-y-1">
-              <Label className="font-medium text-xs">{t("Sidebar Collapse Mode")}</Label>
+              <Label className="font-medium text-xs">Sidebar Collapse Mode</Label>
               <ToggleGroup
                 size="sm"
                 spacing={0}
@@ -264,17 +245,17 @@ export function LayoutControls() {
                 value={collapsible}
                 onValueChange={onSidebarCollapseModeChange}
               >
-                <ToggleGroupItem value="icon" aria-label={t("Icon")}>
-                  {t("Icon")}
+                <ToggleGroupItem value="icon" aria-label="Toggle icon">
+                  Icon
                 </ToggleGroupItem>
-                <ToggleGroupItem value="offcanvas" aria-label={t("OffCanvas")}>
-                  {t("OffCanvas")}
+                <ToggleGroupItem value="offcanvas" aria-label="Toggle offcanvas">
+                  OffCanvas
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
 
             <Button type="button" size="sm" variant="outline" className="w-full text-xs" onClick={handleRestore}>
-              {t("Restore Defaults")}
+              Restore Defaults
             </Button>
           </div>
         </div>

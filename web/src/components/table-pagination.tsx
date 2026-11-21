@@ -7,7 +7,6 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { t } from "@/i18n";
 
 interface TablePaginationProps {
   page: number; // 1-based
@@ -65,11 +64,13 @@ export function TablePagination({
             ))}
           </SelectContent>
         </Select>
-        <span>{t("per page")}</span>
+        <span>条/页</span>
         {total > 0 ? (
-          <span className="tabular-nums">{t("{from}–{to} / {total} total", { from, to, total })}</span>
+          <span className="tabular-nums">
+            {from}–{to} / 共 {total} 条
+          </span>
         ) : (
-          <span>{t("{total} total", { total: 0 })}</span>
+          <span>共 0 条</span>
         )}
       </div>
 
@@ -82,7 +83,7 @@ export function TablePagination({
                 size="icon-sm"
                 disabled={safePage === 1}
                 onClick={() => onPageChange(safePage - 1)}
-                aria-label={t("Previous page")}
+                aria-label="上一页"
               >
                 <ChevronLeftIcon className="size-4" />
               </Button>
@@ -111,7 +112,7 @@ export function TablePagination({
                 size="icon-sm"
                 disabled={safePage === totalPages}
                 onClick={() => onPageChange(safePage + 1)}
-                aria-label={t("Next page")}
+                aria-label="下一页"
               >
                 <ChevronRightIcon className="size-4" />
               </Button>

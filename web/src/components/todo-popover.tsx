@@ -4,7 +4,6 @@ import * as React from "react";
 import { ListTodo } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { t } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 // TodoPopover shows the latest TodoWrite state of a session (chat conversation or
@@ -30,11 +29,11 @@ export function TodoPopover({
     setErr("");
     try {
       const detail = await fetchDetail(seq);
-      const start = detail.indexOf("{"); // detail may carry a "TodoWrite " prefix
+      const start = detail.indexOf("{"); // detail 可能带 "TodoWrite " 前缀
       const parsed = JSON.parse(start >= 0 ? detail.slice(start) : detail);
       setTodos(Array.isArray(parsed?.todos) ? parsed.todos : []);
     } catch {
-      setErr(t("Failed to parse todos"));
+      setErr("解析 Todo 失败");
       setTodos(null);
     } finally {
       setLoading(false);
@@ -54,30 +53,29 @@ export function TodoPopover({
         <button
           type="button"
           disabled={disabled}
-          title={disabled ? t("No todos in this session") : t("View latest todos")}
+          title={disabled ? "本会话暂无 Todo" : "查看最近 Todo"}
           className="text-muted-foreground/70 hover:text-primary flex items-center gap-0.5 text-xs disabled:pointer-events-none disabled:opacity-40"
         >
           <ListTodo className="size-3" />
-          {t("Todo")}
+          Todo
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="max-h-80 w-80 overflow-auto p-2">
         <p className="text-muted-foreground px-1 pb-1 text-[11px] font-medium">
-          {t("Latest todos")}
-          {loading ? ` · ${t("Loading…")}` : ""}
+          最近 Todo{loading ? " · 加载中…" : ""}
         </p>
         {err && <p className="text-destructive px-1 text-xs">{err}</p>}
         {todos && todos.length === 0 && !loading && (
-          <p className="text-muted-foreground px-1 text-xs">{t("(empty)")}</p>
+          <p className="text-muted-foreground px-1 text-xs">（空）</p>
         )}
         <ul className="space-y-0.5">
-          {(todos ?? []).map((todo, i) => (
+          {(todos ?? []).map((t, i) => (
             <li
-              key={`${i}:${todo.content}`}
-              className={cn("flex gap-1.5 px-1 text-xs", todo.status === "completed" && "text-muted-foreground line-through")}
+              key={`${i}:${t.content}`}
+              className={cn("flex gap-1.5 px-1 text-xs", t.status === "completed" && "text-muted-foreground line-through")}
             >
-              <span className="shrink-0">{MARK[todo.status] ?? "☐"}</span>
-              <span className="break-words">{todo.content}</span>
+              <span className="shrink-0">{MARK[t.status] ?? "☐"}</span>
+              <span className="break-words">{t.content}</span>
             </li>
           ))}
         </ul>

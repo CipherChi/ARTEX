@@ -10,14 +10,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/Autumn-27/artex/db"
 )
 
 func TestTaskMetadataPatchReturnsRenameAndPin(t *testing.T) {
 	m, err := NewManager(t.TempDir(), "")
 	if err != nil {
-		db.SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
 	defer m.Close()
 	task, err := m.CreateTask("metadata patch", "goal", nil, 0, 0)
@@ -26,9 +24,7 @@ func TestTaskMetadataPatchReturnsRenameAndPin(t *testing.T) {
 	}
 	taskID, _ := strconv.ParseInt(task.ID, 10, 64)
 	defer func() { _ = m.pg.DeleteTask(taskID) }()
-	ctx, cancel := context.WithCancel(context.Background())
-	s := New(ctx, m, t.TempDir(), t.TempDir(), t.TempDir())
-	defer stopTestServer(t, s, cancel)
+	s := New(context.Background(), m, t.TempDir(), t.TempDir(), t.TempDir())
 	token, err := signJWT(s.jwtKey)
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +50,7 @@ func TestTaskMetadataPatchReturnsRenameAndPin(t *testing.T) {
 		t.Fatalf("unexpected task patch response: %+v", updated)
 	}
 
-	body, _ = json.Marshal(map[string]any{"name": strings.Repeat("x", maxTaskNameRunes+1)})
+	body, _ = json.Marshal(map[string]any{"name": strings.Repeat("任", maxTaskNameRunes+1)})
 	req = httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID, bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec = httptest.NewRecorder()
@@ -67,12 +63,10 @@ func TestTaskMetadataPatchReturnsRenameAndPin(t *testing.T) {
 func TestConversationBatchDeleteReportsMissing(t *testing.T) {
 	m, err := NewManager(t.TempDir(), "")
 	if err != nil {
-		db.SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
 	defer m.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	s := New(ctx, m, t.TempDir(), t.TempDir(), t.TempDir())
-	defer stopTestServer(t, s, cancel)
+	s := New(context.Background(), m, t.TempDir(), t.TempDir(), t.TempDir())
 	first, err := m.pg.CreateConversation("mainagent", "batch-http-first", nil)
 	if err != nil {
 		t.Fatal(err)

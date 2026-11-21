@@ -9,10 +9,9 @@ import (
 func TestConversationPinOrderingAndPatch(t *testing.T) {
 	d, err := Open(testDSN(t))
 	if err != nil {
-		SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
-	// Registered FIRST so it runs LAST, after the row cleanup below.
-	t.Cleanup(func() { d.Close() })
+	defer d.Close()
 
 	suffix := time.Now().UnixNano()
 	first, err := d.CreateConversation("mainagent", fmt.Sprintf("pin-first-%d", suffix), nil)
@@ -25,8 +24,8 @@ func TestConversationPinOrderingAndPatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		cleanupErr(t, "first conversation", d.DeleteConversation(first.ID))
-		cleanupErr(t, "second conversation", d.DeleteConversation(second.ID))
+		_ = d.DeleteConversation(first.ID)
+		_ = d.DeleteConversation(second.ID)
 	})
 
 	pinned := true

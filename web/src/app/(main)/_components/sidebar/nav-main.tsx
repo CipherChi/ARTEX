@@ -4,9 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, MailIcon, PlusCircleIcon } from "lucide-react";
 import { api } from "@/lib/api";
 
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -28,7 +29,6 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { t } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type {
   NavBadge,
@@ -37,7 +37,6 @@ import type {
   NavMainLinkItem,
   NavMainParentItem,
 } from "@/navigation/sidebar/sidebar-items";
-import { setVisibleInterval } from "@/lib/polling";
 
 interface NavMainProps {
   readonly items: readonly NavGroup[];
@@ -87,7 +86,7 @@ function hasSubItems(item: NavMainItem): item is NavMainParentItem {
 
 export function NavMain({ items }: NavMainProps) {
   const rawPath = usePathname();
-  // Route segments contain Chinese, so the pathname may be percent-encoded; decode it before comparing against nav urls so highlighting hits.
+  // 路由段含中文，pathname 可能是百分号编码，解码后再与导航 url 比较，保证高亮命中。
   const path = (() => {
     try {
       return decodeURIComponent(rawPath);
@@ -175,8 +174,8 @@ function InterceptPendingBadge() {
       } catch { /* ignore */ }
     }
     poll();
-    const stopPolling = setVisibleInterval(poll, 5000);
-    return () => { live = false; stopPolling(); };
+    const t = setInterval(poll, 5000);
+    return () => { live = false; clearInterval(t); };
   }, []);
   if (count === 0) return null;
   return (
@@ -321,7 +320,7 @@ function NavItemBadge({ badge }: { badge?: NavBadge }) {
         badge === "soon" && "border-muted-foreground text-muted-foreground",
       )}
     >
-      {t(badge)}
+      {badge}
     </SidebarMenuBadge>
   );
 }

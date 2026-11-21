@@ -2,10 +2,8 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Autumn-27/artex/db"
@@ -78,20 +76,15 @@ func (c *ChatAgent) SetGuard(g *guard.Guard) { c.guard = g }
 
 // chatWorkDirSpec returns a working-directory notice appended to every chat
 // agent's system prompt. Mirrors artifactSpec but without pentest-specific
-// wording ("payload", "capture response bodies") that would be odd in a general assistant.
+// wording ("payload", "抓响应体") that would be odd in a general assistant.
 func chatWorkDirSpec(workDir string) string {
-	return "\n\n**File output rules**: whenever you need to write a file, write it to the working directory " + workDir + " (this is the default CWD — relative paths land here, and you may also use this absolute path) — do not write to /tmp or other absolute paths."
+	return "\n\n**文件输出规约**：需要写文件时，一律写到工作目录 " + workDir + "（这是默认 CWD，相对路径即落在这里，也可用该绝对路径）——不要写 /tmp 或其他绝对路径。"
 }
 
 // chatSystem renders the DB-managed prompt body for agentKey. Custom agents have
 // no per-key in-code default, so DefaultAssistantPrompt is the render fallback.
-// Every chat agent, built-in or custom, can read target-derived content through
-// WebFetch or Bash, so all of them get the code-owned untrusted-content tail
-// after the editable body.
 func chatSystem(agentKey, dataDir, workDir string) string {
-	body := renderSystem(agentKey, DefaultAssistantPrompt, chatVars{DataDir: dataDir, Now: nowStr()})
-	body += untrustedContentTail(body)
-	return body + chatWorkDirSpec(workDir) + noiseProfileBlock()
+	return renderSystem(agentKey, DefaultAssistantPrompt, chatVars{DataDir: dataDir, Now: nowStr()}) + chatWorkDirSpec(workDir)
 }
 
 // chatVars carries the runtime variables a custom agent's prompt may reference.
@@ -99,33 +92,6 @@ func chatSystem(agentKey, dataDir, workDir string) string {
 // universal ones; any other {{.X}} fails to render and falls back to
 // DefaultAssistantPrompt.
 type chatVars struct{ DataDir, Now string }
-
-const maxChatSessionID = 64
-
-// validChatSessionID is the session-directory name contract. Production uses
-// "conv-" plus a decimal id; tests use hyphenated suffixes. Path separators
-// and ".." are rejected so Join cannot leave <workDir>/sessions.
-func validChatSessionID(id string) bool {
-	if id == "" || len(id) > maxChatSessionID {
-		return false
-	}
-	for i := 0; i < len(id); i++ {
-		c := id[i]
-		switch {
-		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '_', c == '-':
-		default:
-			return false
-		}
-	}
-	return true
-}
-
-func sessionDirInside(workDir, sessionWorkDir string) bool {
-	base := filepath.Clean(filepath.Join(workDir, "sessions"))
-	clean := filepath.Clean(sessionWorkDir)
-	sep := string(os.PathSeparator)
-	return clean == base || strings.HasPrefix(clean, base+sep)
-}
 
 // Chat runs ONE turn of a conversation with the agent identified by agentKey,
 // resuming prior history keyed by sessionID. maxTurns is the per-turn agent step
@@ -143,23 +109,16 @@ func (c *ChatAgent) Chat(ctx context.Context, agentKey, sessionID, message strin
 		ws.Enabled = false
 	}
 
-	if !validChatSessionID(sessionID) {
-		return "", fmt.Errorf("invalid session id %q", sessionID)
-	}
 	// Per-session working directory: <workDir>/sessions/<sessionID>/
 	// Isolates file writes across conversations, mirroring how workers use i<intentID>/.
 	sessionWorkDir := filepath.Join(c.workDir, "sessions", sessionID)
-	if !sessionDirInside(c.workDir, sessionWorkDir) {
-		return "", fmt.Errorf("invalid session id %q", sessionID)
-	}
-	// A run directory like the task ones, created the same way (makeRunDir).
-	makeRunDir(c.workDir, sessionWorkDir)
+	_ = os.MkdirAll(sessionWorkDir, 0o755)
 	ctx = intercept.WithReviewWorkingDirectory(ctx, sessionWorkDir)
 
 	// Pure assistant: DefaultTools as the base; AugmentTools layers in the key's
 	// visible skills/MCP and lets the DB tools table filter/override. DefaultTools
 	// have no tools-table rows, so they always pass through.
-	base := defaultTools(c.workDir) // file tools confined to sessionWorkDir (filetools.go)
+	base := actool.DefaultTools()
 	ctx = WithRunInfo(ctx, RunInfo{SessionID: sessionID})
 	tools, def, cleanup := AugmentTools(ctx, agentKey, base)
 	defer cleanup()
@@ -169,65 +128,54 @@ func (c *ChatAgent) Chat(ctx context.Context, agentKey, sessionID, message strin
 		Provider:        c.prov,
 		SystemPrompt:    system,
 		DynamicBoundary: boundary,
-		Tools:           withWebFetch(ctx, tools, c.proxyAddr, c.proxyCACert), // WebFetch: routed through the recording proxy for tracing; loads the proxy CA to verify MITM-resigned HTTPS certificates; every redirect hop is gated
+		Tools:           tools,
 		DeferredTools:   def.Deferred,
 		UnlockSet:       def.Unlock,
 		PermissionMode:  permission.ModeBypass,
-		// Web search (optional). ddgs needs no key; brave-free needs BraveKey; tavily needs TavilyKey.
-		// WebSearchProxy is a dedicated egress proxy (http/https/socks5), unrelated to the traffic-recording MITM proxy; empty = direct.
+		EnableWebFetch:  true, // 走记录代理留痕；载入代理 CA 验证 MITM 重签的 HTTPS 证书
+		WebFetchProxy:   c.proxyAddr,
+		WebFetchCACert:  c.proxyCACert,
+		// 联网搜索(可选)。ddgs 无需 key；brave-free 需 BraveKey；tavily 需 TavilyKey。
+		// WebSearchProxy 是独立出口代理(http/https/socks5)，与记录流量的 MITM 代理无关；空则直连。
 		EnableWebSearch:       ws.Enabled,
 		WebSearchBackend:      ws.Backend,
 		BraveSearchAPIKey:     ws.BraveKey,
 		TavilySearchAPIKey:    ws.TavilyKey,
-		KeenableSearchAPIKey:  ws.KeenableKey,
-		KeenableSearchTitle:   KeenableSearchTitle,
 		DeepSeekSearchBaseURL: ws.DeepSeekBaseURL,
 		DeepSeekSearchAPIKey:  ws.DeepSeekAPIKey,
 		DeepSeekSearchModel:   ws.DeepSeekModel,
 		WebSearchProxy:        ws.Proxy,
-		BashEnv:               proxyEnv(c.proxyAddr, c.proxyCACert), // Bash subcommands go through the proxy + trust the CA by default
+		BashEnv:               proxyEnv(c.proxyAddr, c.proxyCACert), // Bash 子命令默认走代理+信任 CA
 		WorkingDir:            sessionWorkDir,
 		MaxTurns:              maxTurns,
 		MaxDuration:           maxDuration,
 		Compaction:            compactionConfig(c.window),
 		Todos:                 actool.NewTodoStore(),
-		// large tool output spills to cmd-output/ under the session dir, or to the
-		// session's spill directory (spill.go).
-		// the truncation cap uses the SDK default (30000 chars of tool.Capture).
-		ToolOutputDir: SessionToolOutputDir(c.workDir, sessionID, sessionWorkDir),
-		// hitting the budget (steps) → the SDK runs wrap-up: output a one-line summary. The prompt and
-		// wrap-up rounds are editable in the backend per agent key
-		// (each custom agent gets its own copy; empty/0 uses the generic default: 10 rounds).
+		// large tool output spills to cmd-output/ under the session dir.
+		// 截断上限用 SDK 默认(tool.Capture 的 30000 字符)。
+		ToolOutputDir: filepath.Join(sessionWorkDir, "cmd-output"),
+		// 命中预算(步数)→ SDK 跑收尾:输出一句总结。Prompt 与收尾轮数按本 agent key 后台可编辑
+		// (自定义 agent 各自一份;留空/0 用通用默认:10 轮)。
 		Settlement:   wrapupSettlement(agentKey, nil),
-		NonStreaming: c.nonStreaming(), // when this profile selects non-streaming, use Provider.Complete
-		MaxTokens:    c.maxTokens(),    // 0 = send no cap, the server's default decides
-
-		// On by default; ARTEX_UNTRUSTED_BOUNDARY=0 opts out: nonce-frame tool output as untrusted data.
-		UntrustedOutputBoundary: untrustedBoundaryEnabled(),
+		NonStreaming: c.nonStreaming(), // 该 profile 选非流式时走 Provider.Complete
+		MaxTokens:    c.maxTokens(),    // 0 = 不发上限,由服务端默认值决定
 	}
 	if c.guard != nil {
 		opts.Hooks = c.guard.Hooks()
 	}
-	opts.Hooks = SpillHooks(opts.Hooks, opts.ToolOutputDir)
-	// The session id is the provider-side identity (session header, usage metering)
-	// with or without persistence; Norma only puts it on ctx when it writes a transcript.
-	opts.SessionID = sessionID
-	ctx = transcript.WithSessionID(ctx, opts.SessionID)
 	if c.tx != nil { // persist raw human↔AI conversation; one accumulating file per thread
 		opts.Transcript = c.tx
+		opts.SessionID = sessionID
 	}
-	// experimental feature: when enabled, noa takes over context compression (archive centralized under <workDir>/noa/<SessionID>, persistent).
+	// 实验功能:开启后由 noa 接管上下文压缩(归档集中在 <workDir>/noa/<SessionID> 下,持久)。
 	enableNoa(&opts, c.noaEnabledFn, c.workDir, "chat-"+sessionID, noaWarn("chat-"+sessionID))
 	ctx = attachSideCapture(ctx, &opts)
 	s := agentcore.NewSession(opts)
 	defer s.Close()
 	// reload prior conversation so the agent has context across turns (each Chat is
 	// a fresh session). First turn: no file yet → Resume loads nothing and proceeds.
-	// A corrupt or unreadable transcript stops the turn before any model or tool call.
 	if c.tx != nil {
-		if err := resumeSession(s, opts.SessionID); err != nil {
-			return "", err
-		}
+		_ = s.Resume(sessionID)
 	}
 	// re-unlock skill-gated MCPs from prior Skill() calls in the reloaded history so
 	// revealed tools stay callable across the fresh session.

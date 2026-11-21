@@ -17,8 +17,8 @@ type Tool struct {
 	Agents      []string        `json:"agents"`
 	Enabled     bool            `json:"enabled"`
 	Kind        string          `json:"kind"`     // builtin | command | script | http
-	Exec        json.RawMessage `json:"exec"`     // custom tool execution spec (kind!=builtin)
-	Deferred    bool            `json:"deferred"` // deferred schema (via SearchExtraTools/ExecuteExtraTool)
+	Exec        json.RawMessage `json:"exec"`     // 自定义工具执行规格(kind!=builtin)
+	Deferred    bool            `json:"deferred"` // schema 延迟(走 SearchExtraTools/ExecuteExtraTool)
 	Calls       int             `json:"calls"`    // runtime ledger aggregate; not stored in tools
 }
 
@@ -110,13 +110,6 @@ func scanTool(rows interface{ Scan(...any) error }) (*Tool, error) {
 	if err := rows.Scan(&t.Key, &t.System, &t.Description, &t.Schema, &agents, &t.Enabled, &t.Kind, &t.Exec, &t.Deferred); err != nil {
 		return nil, err
 	}
-	if !t.System { // a custom tool's exec is sealed at rest
-		plain, err := openSecret(colToolExec, string(t.Exec))
-		if err != nil {
-			return nil, err
-		}
-		t.Exec = json.RawMessage(plain)
-	}
 	if len(agents) > 0 {
 		_ = json.Unmarshal(agents, &t.Agents)
 	}
@@ -161,15 +154,15 @@ func (d *DB) CreateCustomTool(t *Tool) error {
 	if len(schema) == 0 {
 		schema = json.RawMessage("{}")
 	}
-	exec, err := sealToolExec(t.Exec)
-	if err != nil {
-		return err
+	exec := t.Exec
+	if len(exec) == 0 {
+		exec = json.RawMessage("{}")
 	}
 	agents, _ := json.Marshal(t.Agents)
 	if len(agents) == 0 {
 		agents = json.RawMessage("[]")
 	}
-	_, err = d.Exec(`
+	_, err := d.Exec(`
 INSERT INTO tools(key, system, description, schema, agents, enabled, kind, exec, deferred)
 VALUES ($1, false, $2, $3, $4, $5, $6, $7, $8)`,
 		t.Key, t.Description, schema, agents, t.Enabled, t.Kind, exec, t.Deferred)
@@ -183,27 +176,19 @@ func (d *DB) UpdateCustomTool(t *Tool) error {
 	if len(schema) == 0 {
 		schema = json.RawMessage("{}")
 	}
-	exec, err := sealToolExec(t.Exec)
-	if err != nil {
-		return err
+	exec := t.Exec
+	if len(exec) == 0 {
+		exec = json.RawMessage("{}")
 	}
 	agents, _ := json.Marshal(t.Agents)
 	if len(agents) == 0 {
 		agents = json.RawMessage("[]")
 	}
-	_, err = d.Exec(`
+	_, err := d.Exec(`
 UPDATE tools SET description=$2, schema=$3, agents=$4, enabled=$5, kind=$6, exec=$7, deferred=$8
 WHERE key=$1 AND system=false`,
 		t.Key, t.Description, schema, agents, t.Enabled, t.Kind, exec, t.Deferred)
 	return err
-}
-
-// sealToolExec encrypts a custom tool's exec spec for storage; empty means {}.
-func sealToolExec(exec json.RawMessage) (string, error) {
-	if len(exec) == 0 {
-		exec = json.RawMessage("{}")
-	}
-	return sealSecret(colToolExec, string(exec))
 }
 
 // DeleteCustomTool removes a custom tool (system=false only; built-ins protected).

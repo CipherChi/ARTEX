@@ -20,13 +20,11 @@ import (
 func TestCoreTaskLifecyclePG(t *testing.T) {
 	m, err := NewManager(t.TempDir(), "")
 	if err != nil {
-		db.SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
 	defer m.Close()
 	td := t.TempDir()
-	ctx, cancel := context.WithCancel(context.Background())
-	s := New(ctx, m, td, td, td)
-	defer stopTestServer(t, s, cancel)
+	s := New(context.Background(), m, td, td, td)
 	h := s.Handler()
 	tok, err := signJWT(s.jwtKey)
 	if err != nil {
@@ -64,7 +62,7 @@ func TestCoreTaskLifecyclePG(t *testing.T) {
 	}
 
 	// create a task → 201, returns PG task (string id + exploration_id)
-	code, out := doRetry("POST", "/api/tasks", map[string]string{"description": "smoke", "goal": "Probe the lab target at http://127.0.0.1:9/v1 for unauthenticated data exposure; record one record as evidence and stop."})
+	code, out := doRetry("POST", "/api/tasks", map[string]string{"description": "smoke", "goal": "测试 SQLi/XSS"})
 	if code != 201 {
 		t.Fatalf("create task: %d (%v)", code, out)
 	}
@@ -73,9 +71,6 @@ func TestCoreTaskLifecyclePG(t *testing.T) {
 	if id == "" || expID == 0 {
 		t.Fatalf("bad task payload: %v", out)
 	}
-	defer func() {
-		_, _ = m.pg.Exec(`DELETE FROM assets WHERE type = 'ip' AND ip = '127.0.0.1'`)
-	}()
 
 	// the exploration owns goal node(s) — goal seeding is async, poll briefly
 	var goals []*db.Node

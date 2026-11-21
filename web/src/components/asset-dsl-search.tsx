@@ -5,177 +5,176 @@ import * as React from "react";
 import { SearchIcon } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
-import { t } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 // ── DSL autocomplete ──────────────────────────────────────────────────────────
-// Shared by the global asset view (/function/assets) and the per-task test assets
+// Shared by the global asset view (/function/assets) and the per-task 测试资产
 // search, so both search boxes behave and look identical.
 
 const DSL_FIELDS: { name: string; desc: string; ops: { op: string; desc: string }[] }[] = [
   {
     name: "domain",
-    desc: t("Domain (root domain/subdomain/service domain)"),
+    desc: "域名（根域名/子域名/服务域名）",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "ip",
-    desc: t("IPv4/IPv6 address"),
+    desc: "IPv4/IPv6 地址",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "url",
-    desc: t("Full URL (service/endpoint)"),
+    desc: "完整 URL（服务/接口）",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "root_domain",
-    desc: t("Root domain"),
+    desc: "根域名",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "page_title",
-    desc: t("Page title (HTTP service)"),
+    desc: "页面标题（HTTP 服务）",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "icp",
-    desc: t("ICP filing number"),
+    desc: "ICP 备案号",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "service_name",
-    desc: t("Service name (non-HTTP service)"),
+    desc: "服务名称（非 HTTP 服务）",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "app_name",
-    desc: t("App name"),
+    desc: "应用名称",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "bundle_id",
-    desc: t("App Bundle ID"),
+    desc: "应用 Bundle ID",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "category",
-    desc: t("App category"),
+    desc: "应用分类",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "app_icp",
-    desc: t("App ICP filing"),
+    desc: "应用 ICP 备案",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "method",
-    desc: t("HTTP method GET/POST/PUT/…"),
+    desc: "HTTP 方法 GET/POST/PUT/…",
     ops: [
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "service_type",
-    desc: t("Service type: http | other"),
+    desc: "服务类型：http | other",
     ops: [
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "record_type",
-    desc: t("DNS record type A/CNAME/MX/…"),
+    desc: "DNS 解析类型 A/CNAME/MX/…",
     ops: [
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "technology",
-    desc: t("Technology fingerprint (array field)"),
+    desc: "技术指纹（数组字段）",
     ops: [
-      { op: "=", desc: t("fuzzy match") },
-      { op: "==", desc: t("exact match") },
-      { op: "!=", desc: t("exclude") },
+      { op: "=", desc: "模糊匹配" },
+      { op: "==", desc: "精确匹配" },
+      { op: "!=", desc: "排除" },
     ],
   },
   {
     name: "port",
-    desc: t("Port number (integer)"),
+    desc: "端口号（整数）",
     ops: [
-      { op: "==", desc: t("equals") },
-      { op: "!=", desc: t("not equals") },
-      { op: ">", desc: t("greater than") },
-      { op: ">=", desc: t("greater than or equal") },
-      { op: "<", desc: t("less than") },
-      { op: "<=", desc: t("less than or equal") },
+      { op: "==", desc: "等于" },
+      { op: "!=", desc: "不等于" },
+      { op: ">", desc: "大于" },
+      { op: ">=", desc: "大于等于" },
+      { op: "<", desc: "小于" },
+      { op: "<=", desc: "小于等于" },
     ],
   },
   {
     name: "status_code",
-    desc: t("HTTP status code (integer)"),
+    desc: "HTTP 状态码（整数）",
     ops: [
-      { op: "==", desc: t("equals") },
-      { op: "!=", desc: t("not equals") },
-      { op: ">", desc: t("greater than") },
-      { op: ">=", desc: t("greater than or equal") },
-      { op: "<", desc: t("less than") },
-      { op: "<=", desc: t("less than or equal") },
+      { op: "==", desc: "等于" },
+      { op: "!=", desc: "不等于" },
+      { op: ">", desc: "大于" },
+      { op: ">=", desc: "大于等于" },
+      { op: "<", desc: "小于" },
+      { op: "<=", desc: "小于等于" },
     ],
   },
-  { name: "company_id", desc: t("Owning company ID (integer)"), ops: [{ op: "==", desc: t("equals") }] },
-  { name: "task_id", desc: t("Source task ID (integer)"), ops: [{ op: "==", desc: t("equals") }] },
+  { name: "company_id", desc: "归属企业 ID（整数）", ops: [{ op: "==", desc: "等于" }] },
+  { name: "task_id", desc: "来源任务 ID（整数）", ops: [{ op: "==", desc: "等于" }] },
 ];
 
 const LOGIC_OPS = [
-  { label: "AND", desc: t("AND (both conditions must match)") },
-  { label: "OR", desc: t("OR (either one matches)") },
+  { label: "AND", desc: "且（两个条件都满足）" },
+  { label: "OR", desc: "或（满足其中之一）" },
 ];
 
 interface DslSuggestion {
@@ -262,7 +261,7 @@ const KIND_STYLE: Record<string, string> = {
 };
 
 // AssetDslSearch is the shared DSL search box: a monospace input with a
-// field/operator/logic autocomplete popover and a status line ("found N" /
+// field/operator/logic autocomplete popover and a status line ("找到 N 条" /
 // error / loading). Used by both the global asset view and the per-task view.
 export function AssetDslSearch({
   query,
@@ -342,7 +341,7 @@ export function AssetDslSearch({
         <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={inputRef}
-          placeholder={t("DSL search: {example}", { example: "domain=example AND status_code>=400" })}
+          placeholder="DSL 搜索：domain=example AND status_code>=400"
           value={query}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -376,13 +375,7 @@ export function AssetDslSearch({
       </div>
       {query.trim() && !open && (
         <p className="pl-1 text-[11px] text-muted-foreground">
-          {loading ? (
-            t("Searching…")
-          ) : error ? (
-            <span className="text-destructive">{error}</span>
-          ) : (
-            t("Found {count}", { count: count ?? 0 })
-          )}
+          {loading ? "搜索中…" : error ? <span className="text-destructive">{error}</span> : `找到 ${count ?? 0} 条`}
         </p>
       )}
     </div>

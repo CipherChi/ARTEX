@@ -58,24 +58,20 @@ type Conversation struct {
 	PinnedAt     *time.Time `json:"pinned_at,omitempty"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
-	// TargetGate is the per-conversation opt-in of the approval gate for asset
-	// targets (a chat has no task). false (default) = no gate.
-	TargetGate bool `json:"target_gate"`
 }
 
 // ConversationPatch updates only the fields whose pointers are non-nil.
 type ConversationPatch struct {
-	Title      *string
-	Pinned     *bool
-	TargetGate *bool
+	Title  *string
+	Pinned *bool
 }
 
-const convCols = `id, agent_key, title, llm_profile_id, pinned_at, created_at, updated_at, target_gate`
+const convCols = `id, agent_key, title, llm_profile_id, pinned_at, created_at, updated_at`
 
 func scanConv(row interface{ Scan(...any) error }) (Conversation, error) {
 	var c Conversation
 	var pinnedAt sql.NullTime
-	err := row.Scan(&c.ID, &c.AgentKey, &c.Title, &c.LLMProfileID, &pinnedAt, &c.CreatedAt, &c.UpdatedAt, &c.TargetGate)
+	err := row.Scan(&c.ID, &c.AgentKey, &c.Title, &c.LLMProfileID, &pinnedAt, &c.CreatedAt, &c.UpdatedAt)
 	if pinnedAt.Valid {
 		c.Pinned = true
 		c.PinnedAt = &pinnedAt.Time
@@ -86,12 +82,6 @@ func scanConv(row interface{ Scan(...any) error }) (Conversation, error) {
 // CreateConversation opens a new chat thread for agentKey with an initial title.
 // llmProfileID may be nil to use the globally active profile.
 func (d *DB) CreateConversation(agentKey, title string, llmProfileID *int64) (*Conversation, error) {
-	return d.CreateConversationGated(agentKey, title, llmProfileID, false)
-}
-
-// CreateConversationGated is CreateConversation with the target-gate opt-in set
-// at creation.
-func (d *DB) CreateConversationGated(agentKey, title string, llmProfileID *int64, targetGate bool) (*Conversation, error) {
 	tx, err := d.Begin()
 	if err != nil {
 		return nil, err
@@ -102,8 +92,8 @@ func (d *DB) CreateConversationGated(agentKey, title string, llmProfileID *int64
 	// by this transaction before it takes a profile lock, matching DeleteProfile's
 	// child-row -> profile-row protocol.
 	c, err := scanConv(tx.QueryRow(`
-INSERT INTO conversations(agent_key, title, llm_profile_id, target_gate) VALUES ($1, $2, NULL, $3)
-RETURNING `+convCols, agentKey, title, targetGate))
+INSERT INTO conversations(agent_key, title, llm_profile_id) VALUES ($1, $2, NULL)
+RETURNING `+convCols, agentKey, title))
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +169,7 @@ func (d *DB) GetConversation(id int64) (*Conversation, error) {
 	return &c, nil
 }
 
-// UpdateConversation applies a partial title/pin/target-gate mutation and returns the updated
+// UpdateConversation applies a partial title/pin mutation and returns the updated
 // row. Pinning an already-pinned conversation preserves its original pin order.
 func (d *DB) UpdateConversation(id int64, patch ConversationPatch) (*Conversation, error) {
 	c, err := scanConv(d.QueryRow(`UPDATE conversations SET
@@ -188,10 +178,9 @@ func (d *DB) UpdateConversation(id int64, patch ConversationPatch) (*Conversatio
 		WHEN $4::boolean IS NULL THEN pinned_at
 		WHEN $4::boolean THEN COALESCE(pinned_at, now())
 		ELSE NULL
-	END,
-	target_gate = CASE WHEN $5::boolean THEN $6 ELSE target_gate END
+	END
 WHERE id=$1
-RETURNING `+convCols, id, patch.Title != nil, patch.Title, patch.Pinned, patch.TargetGate != nil, patch.TargetGate))
+RETURNING `+convCols, id, patch.Title != nil, patch.Title, patch.Pinned))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -214,37 +203,19 @@ func (d *DB) TouchConversation(id int64) error {
 	return err
 }
 
-// DeleteConversation removes a thread; its activities cascade via FK. Its
-// target pins are not rows of the thread: they are revoked in the same
-// transaction and stay as history.
+// DeleteConversation removes a thread; its activities cascade via FK.
 func (d *DB) DeleteConversation(id int64) error {
-	tx, err := d.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := revokeConversationPins(tx, []int64{id}); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`DELETE FROM conversations WHERE id=$1`, id); err != nil {
-		return err
-	}
-	return tx.Commit()
+	_, err := d.Exec(`DELETE FROM conversations WHERE id=$1`, id)
+	return err
 }
 
 // DeleteConversations removes existing threads in one statement and returns the
-// ids that were actually present. Child activities and trigger runs cascade. The
-// target pins of the removed threads are revoked in the same transaction.
+// ids that were actually present. Child activities and trigger runs cascade.
 func (d *DB) DeleteConversations(ids []int64) ([]int64, error) {
 	if len(ids) == 0 {
 		return []int64{}, nil
 	}
-	tx, err := d.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	rows, err := tx.Query(`DELETE FROM conversations WHERE id=ANY($1::bigint[]) RETURNING id`, ids)
+	rows, err := d.Query(`DELETE FROM conversations WHERE id=ANY($1::bigint[]) RETURNING id`, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -257,14 +228,7 @@ func (d *DB) DeleteConversations(ids []int64) ([]int64, error) {
 		}
 		deleted = append(deleted, id)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	rows.Close()
-	if err := revokeConversationPins(tx, deleted); err != nil {
-		return nil, err
-	}
-	return deleted, tx.Commit()
+	return deleted, rows.Err()
 }
 
 // AppendConvActivity records one step of a conversation (human message or an agent

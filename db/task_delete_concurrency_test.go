@@ -13,7 +13,7 @@ func TestDeleteTaskTrafficHostsUseOneLockedTransaction(t *testing.T) {
 	dsn := testDSN(t)
 	d, err := Open(dsn)
 	if err != nil {
-		SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) - skipping", err)
 	}
 	defer d.Close()
 

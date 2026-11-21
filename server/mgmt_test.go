@@ -7,27 +7,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/Autumn-27/artex/db"
 )
 
 // TestMgmtAPI exercises the PostgreSQL-backed management API through the real mux.
 func TestMgmtAPI(t *testing.T) {
 	m, err := NewManager(t.TempDir(), "")
 	if err != nil {
-		db.SkipPGUnavailable(t, err)
+		t.Skipf("database unavailable (%v) — skipping management API test", err)
 	}
 	if m.pg == nil {
-		db.SkipNoPG(t)
+		t.Skip("postgres unavailable — skipping management API test")
 	}
-	// New starts the notifier and task-archive workers on context.Background();
-	// closing the pool stops them from claiming later tests' digest batches
-	// and archive jobs.
-	defer m.Close()
 	td := t.TempDir()
-	ctx, cancel := context.WithCancel(context.Background())
-	s := New(ctx, m, td, td, td)
-	defer stopTestServer(t, s, cancel)
+	s := New(context.Background(), m, td, td, td)
 	h := s.Handler()
 	tok, err := signJWT(s.jwtKey)
 	if err != nil {
@@ -66,7 +58,7 @@ func TestMgmtAPI(t *testing.T) {
 	}
 
 	// valid template using seeded catalog vars → 200
-	code, _ = do("PUT", "/api/agents/planner/prompt", map[string]string{"template": "You are the planner. Goal: {{.Goal}}, summary {{.AssetSummary}}"})
+	code, _ = do("PUT", "/api/agents/planner/prompt", map[string]string{"template": "你是规划者，目标：{{.Goal}}，摘要 {{.AssetSummary}}"})
 	if code != 200 {
 		t.Fatalf("valid prompt save: %d", code)
 	}
@@ -76,7 +68,7 @@ func TestMgmtAPI(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("preview: %d", code)
 	}
-	if rendered, _ := out["rendered"].(string); rendered == "" || rendered == "You are the planner. Goal: {{.Goal}}, summary {{.AssetSummary}}" {
+	if rendered, _ := out["rendered"].(string); rendered == "" || rendered == "你是规划者，目标：{{.Goal}}，摘要 {{.AssetSummary}}" {
 		t.Fatalf("preview did not substitute: %q", out["rendered"])
 	}
 

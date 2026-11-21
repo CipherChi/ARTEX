@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"testing"
 	"time"
 )
@@ -13,10 +12,9 @@ import (
 func TestProfileRetryRoundTrip(t *testing.T) {
 	d, err := Open(testDSN(t))
 	if err != nil {
-		SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
-	// Registered FIRST so it runs LAST, after the row cleanup below.
-	t.Cleanup(func() { d.Close() })
+	defer d.Close()
 
 	want := RetryOverride{
 		Connect: RetryRule{Attempts: 5, IntervalMS: 2000},
@@ -24,12 +22,12 @@ func TestProfileRetryRoundTrip(t *testing.T) {
 		Stream:  RetryRule{IntervalMS: 250},
 	}
 	id, err := d.SaveProfile(&LLMProfile{
-		Name: fmt.Sprintf("t-retry-roundtrip-%d", time.Now().UnixNano()), Format: "openai", Model: "m", APIKey: "k", Retry: want,
+		Name: "t-retry-roundtrip", Format: "openai", Model: "m", APIKey: "k", Retry: want,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { deleteTestProfile(t, d, id) })
+	t.Cleanup(func() { d.Exec(`DELETE FROM llm_profiles WHERE id=$1`, id) })
 
 	got, err := d.ProfileByID(id)
 	if err != nil || got == nil {
@@ -71,19 +69,18 @@ func TestProfileRetryRoundTrip(t *testing.T) {
 func TestProfileRetryClampedOnSave(t *testing.T) {
 	d, err := Open(testDSN(t))
 	if err != nil {
-		SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
-	// Registered FIRST so it runs LAST, after the row cleanup below.
-	t.Cleanup(func() { d.Close() })
+	defer d.Close()
 
 	id, err := d.SaveProfile(&LLMProfile{
-		Name: fmt.Sprintf("t-retry-clamp-%d", time.Now().UnixNano()), Format: "openai", Model: "m", APIKey: "k",
+		Name: "t-retry-clamp", Format: "openai", Model: "m", APIKey: "k",
 		Retry: RetryOverride{Connect: RetryRule{Attempts: -99, IntervalMS: -5}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { deleteTestProfile(t, d, id) })
+	t.Cleanup(func() { d.Exec(`DELETE FROM llm_profiles WHERE id=$1`, id) })
 	got, err := d.ProfileByID(id)
 	if err != nil || got == nil {
 		t.Fatalf("ProfileByID: %v", err)
@@ -98,24 +95,19 @@ func TestProfileRetryClampedOnSave(t *testing.T) {
 func TestLLMRetryPolicyRoundTrip(t *testing.T) {
 	d, err := Open(testDSN(t))
 	if err != nil {
-		SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
-	// Registered FIRST so it runs LAST, after the restore below.
-	t.Cleanup(func() { d.Close() })
+	defer d.Close()
 
 	before, hadBefore, err := d.GetSetting(settingLLMRetryPolicy)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		var err error
 		if hadBefore {
-			err = d.SetSetting(settingLLMRetryPolicy, before)
+			d.SetSetting(settingLLMRetryPolicy, before)
 		} else {
-			_, err = d.Exec(`DELETE FROM settings WHERE key=$1`, settingLLMRetryPolicy)
-		}
-		if err != nil {
-			t.Errorf("restore %s: %v", settingLLMRetryPolicy, err)
+			d.Exec(`DELETE FROM settings WHERE key=$1`, settingLLMRetryPolicy)
 		}
 	})
 
@@ -135,7 +127,7 @@ func TestLLMRetryPolicyRoundTrip(t *testing.T) {
 		t.Fatalf("breaker interval=%v, want 90s", d)
 	}
 
-	// Out-of-range values written in are also clamped back into range; reads return the clamped values.
+	// 越界值写进去也会被夹回区间，读出来是夹紧后的值。
 	if err := d.SetLLMRetryPolicy(LLMRetryPolicy{Stream: RetryRule{Attempts: 999, IntervalMS: 99_999_999}}); err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +135,7 @@ func TestLLMRetryPolicyRoundTrip(t *testing.T) {
 		t.Fatalf("stream=%+v, want the 20 / 1h caps", got)
 	}
 
-	// Missing key = all defaults.
+	// 键不存在 = 全默认。
 	if _, err := d.Exec(`DELETE FROM settings WHERE key=$1`, settingLLMRetryPolicy); err != nil {
 		t.Fatal(err)
 	}

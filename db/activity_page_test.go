@@ -8,11 +8,11 @@ import "testing"
 func TestActivityPageSessions(t *testing.T) {
 	d, err := Open(testDSN(t))
 	if err != nil {
-		SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
 	defer d.Close()
 
-	expID, err := d.CreateExploration("test", "paged history")
+	expID, err := d.CreateExploration("test", "分页历史")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,11 +129,11 @@ func TestActivityPageSessions(t *testing.T) {
 func TestListByKindPage(t *testing.T) {
 	d, err := Open(testDSN(t))
 	if err != nil {
-		SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
 	defer d.Close()
 
-	expID, err := d.CreateExploration("test", "intent paging")
+	expID, err := d.CreateExploration("test", "意图分页")
 	if err != nil {
 		t.Fatal(err)
 	}

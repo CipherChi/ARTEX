@@ -9,14 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/Autumn-27/artex/db"
 )
 
 func TestTaskArchiveAPIQueueListAndLimits(t *testing.T) {
 	m, err := NewManager(t.TempDir(), "")
 	if err != nil {
-		db.SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) - skipping", err)
 	}
 	defer m.Close()
 	task, err := m.CreateTask("archive api", "verify 202", nil, 0, 0)

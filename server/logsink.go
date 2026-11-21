@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -76,7 +75,7 @@ func (s *logSinkT) SetDB(ctx context.Context, pg *db.DB) {
 					TS:    l.CreatedAt.Format(time.RFC3339),
 					Level: l.Level,
 					Tag:   l.Tag,
-					Text:  maskURLCredentials(l.Text), // rows written before the sink masked them
+					Text:  l.Text,
 				})
 			}
 			// Prepend history before any in-memory startup logs already in ring.
@@ -118,25 +117,10 @@ func (s *logSinkT) SetDB(ctx context.Context, pg *db.DB) {
 	})
 }
 
-// urlCredentials matches scheme://user:password@ up to the last @ of the
-// authority.
-var urlCredentials = regexp.MustCompile(`([a-zA-Z][a-zA-Z0-9+.-]*://[^/\s:@?#]*):[^/\s?#]*@`)
-
-// maskURLCredentials replaces the password of every scheme://user:password@ in
-// text. It is a second line of defence for the log sink, which /api/logs
-// serves: a log call should not format a secret in the first place.
-func maskURLCredentials(text string) string {
-	if !strings.Contains(text, "://") {
-		return text
-	}
-	return urlCredentials.ReplaceAllString(text, "${1}:xxxxx@")
-}
-
 // Write implements io.Writer for the log package: one call per log.Printf line.
 func (s *logSinkT) Write(p []byte) (int, error) {
-	text := maskURLCredentials(string(p))
-	_, _ = io.WriteString(s.out, text) // keep the terminal output
-	line := strings.TrimRight(text, "\n")
+	_, _ = s.out.Write(p) // keep the terminal output
+	line := strings.TrimRight(string(p), "\n")
 	if strings.TrimSpace(line) != "" {
 		s.add(parseLog(line))
 	}
@@ -228,12 +212,12 @@ func parseLog(line string) LogLine {
 
 func levelOf(msg string) string {
 	low := strings.ToLower(msg)
-	for _, k := range []string{"fatal", "panic", "error", "err:", "failed", "dropped", "refused", "✕", "unreachable"} {
+	for _, k := range []string{"fatal", "panic", "error", "err:", "失败", "丢弃", "拒绝", "✕", "不可达"} {
 		if strings.Contains(low, k) {
 			return "error"
 		}
 	}
-	for _, k := range []string{"warn", "disabled", "disable", "skip", "stopped", "⚠", "retry"} {
+	for _, k := range []string{"warn", "disabled", "禁用", "skip", "stopped", "⚠", "重试"} {
 		if strings.Contains(low, k) {
 			return "warn"
 		}

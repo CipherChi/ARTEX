@@ -10,10 +10,9 @@ import (
 func TestCustomToolCRUD(t *testing.T) {
 	d, err := Open(testDSN(t))
 	if err != nil {
-		SkipPGUnavailable(t, err)
+		t.Skipf("postgres unavailable (%v) — skipping", err)
 	}
-	// Registered FIRST so it runs LAST, after the row cleanup below.
-	t.Cleanup(func() { d.Close() })
+	defer d.Close()
 
 	key := "ct_test_tool"
 	_ = d.DeleteCustomTool(key) // clean slate
@@ -31,7 +30,7 @@ func TestCustomToolCRUD(t *testing.T) {
 	if err := d.CreateCustomTool(in); err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	t.Cleanup(func() { cleanupErr(t, "custom tool", d.DeleteCustomTool(key)) })
+	t.Cleanup(func() { _ = d.DeleteCustomTool(key) })
 
 	got, err := d.GetTool(key)
 	if err != nil || got == nil {

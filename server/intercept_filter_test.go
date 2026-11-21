@@ -13,7 +13,7 @@ import (
 func TestInterceptFilterHTTP(t *testing.T) {
 	dsn, _, err := db.DSN()
 	if err != nil {
-		db.SkipPGUnavailable(t, err)
+		t.Skip("no test database configured")
 	}
 	d, err := db.Open(dsn)
 	if err != nil {
@@ -34,11 +34,11 @@ func TestInterceptFilterHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, state := range []string{"pending", "allowed", "denied", "timeout"} {
-		if _, err := d.CreateDecidedIntercept(0, 0, scope, "test", "Bash", []byte(`{}`), state, "[model] fixture"); err != nil {
+		if _, err := d.CreateDecidedIntercept(0, 0, scope, "test", "Bash", []byte(`{}`), state, "[模型] fixture"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := d.CreateDecidedIntercept(0, 0, scope+"-other", "test", "Bash", []byte(`{}`), "denied", "[model] fixture"); err != nil {
+	if _, err := d.CreateDecidedIntercept(0, 0, scope+"-other", "test", "Bash", []byte(`{}`), "denied", "[模型] fixture"); err != nil {
 		t.Fatal(err)
 	}
 	do := func(path string, auth bool) *httptest.ResponseRecorder {

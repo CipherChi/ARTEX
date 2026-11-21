@@ -1,13 +1,12 @@
 // Package enrich is the engine-side (non-AI) asset auto-completion layer described
-// in the asset model and auto-association design doc §5: an async worker pool that
-// resolves domains (dnsx) and probes web assets (HTTP, through the recording proxy)
-// and writes the results back into the asset graph — creating IP/port nodes,
-// resolves/exposes edges, and filling attrs.dns / attrs.http. DNS is ungated; HTTP
-// probing is gated by RoE (§5.2).
+// in docs/资产模型与自动关联设计.md §5: an async worker pool that resolves domains
+// (dnsx) and probes web assets (HTTP, through the recording proxy) and writes the
+// results back into the asset graph — creating IP/port nodes, resolves/exposes
+// edges, and filling attrs.dns / attrs.http. DNS is ungated; HTTP probing is gated
+// by RoE (§5.2).
 package enrich
 
 import (
-	"context"
 	"crypto/tls"
 	"html"
 	"io"
@@ -21,8 +20,6 @@ import (
 	"time"
 
 	"github.com/Autumn-27/artex/db"
-	"github.com/Autumn-27/artex/egress"
-	"github.com/Autumn-27/artex/intercept"
 
 	"github.com/miekg/dns"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
@@ -37,9 +34,8 @@ const (
 
 type job struct {
 	kind jobKind
-	id   int64           // asset id (domain for DNS, site for HTTP)
-	arg  string          // host (DNS) or url (HTTP)
-	ctx  context.Context // HTTP: carries the target scope the probe dials under
+	id   int64  // asset id (domain for DNS, site for HTTP)
+	arg  string // host (DNS) or url (HTTP)
 }
 
 // Engine owns the resolver, the proxy-routed HTTP client, and the worker pool.
@@ -75,7 +71,7 @@ func New(as *db.AssetStore, proxy func() string, workers int) *Engine {
 		Timeout:       4 * time.Second,
 	})
 	if err != nil {
-		log.Printf("[enrich] dnsx init failed, DNS resolution disabled: %v", err)
+		log.Printf("[enrich] dnsx 初始化失败，DNS 解析停用：%v", err)
 		resolv = nil
 	}
 	e := &Engine{
@@ -94,25 +90,15 @@ func New(as *db.AssetStore, proxy func() string, workers int) *Engine {
 // buildClient returns an HTTP client that dials via the recording proxy (resolved
 // per-request via proxy(), so the traffic-capture toggle applies live) and skips
 // TLS verification (the proxy re-signs with its MITM CA; targets are often
-// self-signed — this is a pentest probe). Every connection goes through
-// intercept.PinnedDialer, under the target scope of the request's context: a
-// probe without a scope is refused. When the scope's gate is on, the probe
-// connects to the target itself, without the proxy, so that the dialer decides
-// on the target and connects only to the addresses a pin covers. Every request
-// goes through the egress governor current at that request (the noise profile;
-// off by default), so a changed profile applies without rebuilding the client.
+// self-signed — this is a pentest probe).
 func buildClient(proxy func() string) *http.Client {
 	tr := &http.Transport{
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 		DisableKeepAlives:   true,
 		TLSHandshakeTimeout: httpTimeout,
-		DialContext:         intercept.PinnedDialer("enrich", true),
 	}
 	if proxy != nil {
-		tr.Proxy = func(req *http.Request) (*url.URL, error) {
-			if intercept.GateOn(req.Context()) {
-				return nil, nil // direct: the dialer decides on the target
-			}
+		tr.Proxy = func(*http.Request) (*url.URL, error) {
 			p := proxy()
 			if p == "" {
 				return nil, nil // direct
@@ -121,7 +107,7 @@ func buildClient(proxy func() string) *http.Client {
 		}
 	}
 	return &http.Client{
-		Transport: egress.Dynamic("enrich", tr),
+		Transport: tr,
 		Timeout:   httpTimeout,
 		// cap redirects; keep them within scope by re-checking at probe time
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
@@ -130,14 +116,10 @@ func buildClient(proxy func() string) *http.Client {
 
 // ResolveDomain enqueues a DNS resolution for a domain asset (ungated). host is the
 // FQDN. No-op for an empty engine.
-func (e *Engine) ResolveDomain(id int64, host string) { e.enqueue(job{jobDNS, id, host, nil}) }
+func (e *Engine) ResolveDomain(id int64, host string) { e.enqueue(job{jobDNS, id, host}) }
 
 // ProbeSite enqueues an HTTP probe for a web-asset (site). rawURL is the site URL.
-// ctx carries the target scope of the call that asks for the probe: the probe
-// connects under that scope (see buildClient).
-func (e *Engine) ProbeSite(ctx context.Context, id int64, rawURL string) {
-	e.enqueue(job{jobHTTP, id, rawURL, ctx})
-}
+func (e *Engine) ProbeSite(id int64, rawURL string) { e.enqueue(job{jobHTTP, id, rawURL}) }
 
 func (e *Engine) enqueue(j job) {
 	if e == nil || id0(j.id) || j.arg == "" {
@@ -146,7 +128,7 @@ func (e *Engine) enqueue(j job) {
 	select {
 	case e.jobs <- j:
 	default: // queue full → drop (best-effort enrichment)
-		log.Printf("[enrich] queue full, dropping job kind=%d id=%d", j.kind, j.id)
+		log.Printf("[enrich] 队列已满，丢弃任务 kind=%d id=%d", j.kind, j.id)
 	}
 }
 
@@ -173,7 +155,7 @@ func (e *Engine) worker() {
 			case jobDNS:
 				e.doDNS(j.id, j.arg)
 			case jobHTTP:
-				e.doHTTP(j.ctx, j.id, j.arg)
+				e.doHTTP(j.id, j.arg)
 			}
 		}
 	}
@@ -239,15 +221,16 @@ func (e *Engine) doDNS(id int64, host string) {
 
 var reTitle = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
 
-func (e *Engine) doHTTP(ctx context.Context, id int64, rawURL string) {
+func (e *Engine) doHTTP(id int64, rawURL string) {
 	host := hostOf(rawURL)
 	if host == "" {
 		return
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	req, err := http.NewRequest("GET", rawURL, nil)
 	if err != nil {
 		return
 	}
+	req.Header.Set("User-Agent", "artex-enrich/1.0")
 	resp, err := e.client.Do(req)
 	if err != nil {
 		return
@@ -279,6 +262,20 @@ func hostOf(rawURL string) string {
 		return ""
 	}
 	return u.Hostname()
+}
+
+func isBlank(v any) bool {
+	switch x := v.(type) {
+	case nil:
+		return true
+	case string:
+		return x == ""
+	case float64:
+		return x == 0
+	case int:
+		return x == 0
+	}
+	return false
 }
 
 func uniq(in []string) []string {

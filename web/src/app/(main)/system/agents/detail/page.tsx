@@ -9,7 +9,6 @@ import { ArrowLeftIcon } from "lucide-react";
 
 import { AgentEditor } from "@/components/agent-editor";
 import { Button } from "@/components/ui/button";
-import { t } from "@/i18n";
 
 // Deep-link editor page for one agent. The primary flow is the drawer on
 // /system/agents; this page reuses the same AgentEditor component full-width so a
@@ -22,12 +21,12 @@ function AgentDetailInner() {
     <div className="flex flex-1 flex-col gap-4">
       <div className="flex items-center gap-2">
         <Button asChild variant="ghost" size="icon-sm">
-          <Link href="/system/agents" aria-label={t("Back")}>
+          <Link href="/system/agents">
             <ArrowLeftIcon className="size-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">{t("Agent")}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Agent</h1>
           <p className="text-muted-foreground font-mono text-xs">{key}</p>
         </div>
       </div>

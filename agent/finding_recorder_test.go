@@ -25,10 +25,7 @@ func TestReportFindingOptionalTrafficWithoutCapture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		_, _ = d.DeleteFindingsByTask(task.ID)
-		_ = d.DeleteTask(task.ID)
-	}()
+	defer d.DeleteTask(task.ID)
 	ts := NewToolSet(nil, "")
 	ts.ts, ts.taskID = d.Exploration(task.ExplorationID), task.ID
 	ts.SetFindingRecorder(evidence.New(d, nil, t.TempDir()))
@@ -54,19 +51,16 @@ func TestReportFindingOptionalTrafficWithoutCapture(t *testing.T) {
 }
 
 func TestReportFindingAtomicContract(t *testing.T) {
-	old := FindingTrafficBindingEnabled()
-	SetFindingTrafficBindingEnabled(func() bool { return true })
-	t.Cleanup(func() { SetFindingTrafficBindingEnabled(old) })
+	old := FindingTrafficBindingEnabled
+	FindingTrafficBindingEnabled = func() bool { return true }
+	t.Cleanup(func() { FindingTrafficBindingEnabled = old })
 	d := testDB(t)
 	defer d.Close()
 	task, err := d.CreateTask("report contract", "fixture", nil, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		_, _ = d.DeleteFindingsByTask(task.ID)
-		_ = d.DeleteTask(task.ID)
-	}()
+	defer d.DeleteTask(task.ID)
 	ts := NewToolSet(nil, "")
 	ts.ts = d.Exploration(task.ExplorationID)
 	ts.taskID = task.ID
@@ -105,7 +99,7 @@ func TestReportFindingAtomicContract(t *testing.T) {
 	if err != nil || f == nil || f.NodeID == nil || *f.NodeID != out.NodeID {
 		t.Fatalf("wrong finding/node mapping: %+v %v", f, err)
 	}
-	if got = call(`{"vulnclass":"TEST","summary":"no storage","severity":"low","traffic_refs":[{"traffic_id":"x"}]}`); !strings.Contains(got, "NOT registered") {
+	if got = call(`{"vulnclass":"TEST","summary":"no storage","severity":"low","traffic_refs":[{"traffic_id":"x"}]}`); !strings.Contains(got, "未登记") {
 		t.Fatal(got)
 	}
 	if notices != 1 {
